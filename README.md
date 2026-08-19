@@ -148,3 +148,50 @@ Esta base não executa edição de arquivos nem comandos Git automaticamente: a 
 ```bash
 python -m pytest
 ```
+
+## Roadmap de 1 ano
+
+### Meses 1–3 — Fundação
+
+- Estabilizar fila, dependências e concorrência.
+- Adicionar logs reais dos workers e progresso no dashboard.
+- Criar a API separada em Elysia.
+- Adicionar testes de integração e CI.
+- Documentar configuração, segurança e convenções do projeto.
+
+**Meta:** execução confiável sem tasks órfãs ou bloqueadas indefinidamente.
+
+### Meses 4–6 — Execução real
+
+- Permitir que workers leiam e alterem arquivos dentro de um escopo controlado.
+- Adicionar diffs, aprovação e rollback.
+- Executar comandos em sandbox.
+- Validar alterações com testes automáticos após cada task.
+- Suportar tasks com múltiplos arquivos e dependências complexas.
+
+**Meta:** workers implementarem mudanças reais com segurança.
+
+### Meses 7–9 — Produto
+
+- Criar o dashboard web em Next.js.
+- Exibir tasks, workers, logs, métricas e resultados.
+- Adicionar autenticação e permissões.
+- Implementar notificações, cancelamento, retry e priorização.
+- Criar templates de projetos, incluindo Next.js + Elysia.
+
+**Meta:** tornar o orquestrador útil para uma equipe de desenvolvimento.
+
+### Meses 10–12 — Escala e maturidade
+
+- Suportar múltiplos projetos e workspaces.
+- Adicionar execução distribuída dos workers.
+- Melhorar métricas de tokens, tempo e custo.
+- Implementar observabilidade, backups e recuperação.
+- Avaliar automaticamente a qualidade das respostas.
+- Preparar documentação pública e processo de releases.
+
+**Meta:** oferecer um sistema self-hosted confiável para projetos reais.
+
+### Resultado esperado após 1 ano
+
+Orquestração multiagente com frontend Next.js, backend Elysia, execução controlada de código, aprovação e rollback, dashboard operacional, testes automatizados, suporte a múltiplos projetos e métricas de qualidade, tempo e custo.
