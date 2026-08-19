@@ -1,0 +1,27 @@
+ollama:
+  base_url: ${OLLAMA_BASE_URL}
+  model: ${OLLAMA_MODEL}
+  timeout: ${OLLAMA_TIMEOUT}
+  max_concurrent_requests: ${MAX_CONCURRENT_REQUESTS}
+workers:
+  architect:
+    id: worker-1
+    role: architect
+    model: ${OLLAMA_MODEL}
+    temperature: 0.2
+  backend:
+    id: worker-2
+    role: backend
+    model: ${OLLAMA_MODEL}
+    temperature: 0.2
+  frontend:
+    id: worker-3
+    role: frontend
+    model: ${OLLAMA_MODEL}
+    temperature: 0.2
+  qa:
+    id: worker-4
+    role: qa
+    model: ${OLLAMA_MODEL}
+    temperature: 0.1
+
