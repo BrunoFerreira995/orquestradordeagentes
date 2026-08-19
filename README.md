@@ -167,6 +167,237 @@ Para gerar um projeto completo usando o template Next.js + Elysia:
 
 O gerador cria `web/`, `api/` e `template.json` dentro do destino. O diretório precisa estar vazio e a geração exige Node.js/npx, Bun e internet para baixar os scaffolds.
 
+### Rodar um projeto gerado
+
+Depois da geração, copie a configuração compartilhada e ajuste as credenciais:
+
+```bash
+cd workspace/meu-projeto
+cp .env.example .env
+```
+
+Para criar e iniciar backend e frontend automaticamente:
+
+```bash
+cd ../..
+./scripts/create_project.sh workspace/meu-projeto --start
+```
+
+As portas padrão são API `3000` e frontend `3001`. Para usar portas diferentes:
+
+```bash
+./scripts/start_project.sh workspace/meu-projeto \
+  --api-port 4100 \
+  --web-port 4101
+```
+
+Acesse `http://localhost:3001` (ou a porta configurada do frontend). O launcher imprime os PIDs e grava os logs em:
+
+```text
+workspace/meu-projeto/logs/api.log
+workspace/meu-projeto/logs/web.log
+```
+
+Para iniciar os serviços separadamente:
+
+```bash
+cd workspace/meu-projeto/api
+PORT=4100 bun run dev
+```
+
+Em outro terminal:
+
+```bash
+cd workspace/meu-projeto/web
+NEXT_PUBLIC_API_URL=http://localhost:4100 bun run dev -- -p 4101
+```
+
+Para parar, use os PIDs mostrados pelo launcher, por exemplo:
+
+```bash
+kill API_PID FRONTEND_PID
+```
+
+Substitua `API_PID` e `FRONTEND_PID` pelos números reais exibidos no terminal. As portas da API e do frontend devem ser diferentes e estar livres.
+
+Se aparecer `EADDRINUSE`, descubra o processo que está usando a porta e encerre-o:
+
+```bash
+lsof -nP -iTCP:4101 -sTCP:LISTEN
+kill PID
+```
+
+Ou escolha outra porta, por exemplo `--web-port 4102`.
+
+Se a API já estiver funcionando e você quiser iniciar somente o frontend, reutilize-a:
+
+```bash
+./scripts/start_project.sh workspace/meu-projeto \
+  --api-port 4100 \
+  --web-port 4102 \
+  --reuse-api
+```
+
+### Criar banco de teste
+
+Para inicializar um banco SQLite isolado, aplicar as migrations e criar um administrador de teste:
+
+```bash
+./scripts/create_test_db.sh workspace/meu-projeto
+```
+
+O banco padrão é `workspace/meu-projeto/api/data/test.db`, com o usuário `admin@test.local` e senha `password123`. Para alterar esses valores:
+
+```bash
+./scripts/create_test_db.sh workspace/meu-projeto \
+  --db-path data/integration.db \
+  --admin-email qa@example.com \
+  --admin-password 'senha-segura-de-teste'
+```
+
+O script é idempotente: aplica apenas migrations ainda não registradas e preserva os dados existentes.
+
+### Capturar screenshots das páginas
+
+O screenshot percorre os links internos encontrados na página inicial. Portanto, primeiro deixe o frontend funcionando e confirme que ele abre no navegador.
+
+#### 1. Instalar o Playwright
+
+Faça a instalação dentro do frontend do projeto:
+
+```bash
+(cd workspace/meu-projeto/web && npm install -D playwright && npx playwright install chromium)
+```
+
+O segundo comando instala o navegador Chromium usado pelo script.
+
+#### 2. Iniciar o frontend
+
+```bash
+./scripts/start_project.sh workspace/meu-projeto \
+  --api-port 4100 \
+  --web-port 4101
+```
+
+Ou inicie somente o frontend:
+
+```bash
+cd workspace/meu-projeto/web
+NEXT_PUBLIC_API_URL=http://localhost:4100 bun run dev -- -p 4101
+```
+
+#### 3. Capturar as páginas
+
+Em outro terminal, na raiz do repositório:
+
+```bash
+./scripts/screenshot_project.sh \
+  --url http://localhost:4101 \
+  --api-url http://localhost:4100 \
+  --project-dir workspace/meu-projeto/web \
+  --output screenshots/meu-projeto
+```
+
+O script abre a URL, segue somente links do mesmo domínio, visita cada rota, aguarda a rede estabilizar e salva um PNG em tela cheia. Por exemplo, a página inicial será salva como `screenshots/meu-projeto/home.png`.
+
+Para revisar responsividade, repita a captura em três viewports:
+
+```bash
+./scripts/screenshot_project.sh --url http://localhost:4101 --api-url http://localhost:4100 --project-dir workspace/meu-projeto/web --output screenshots/meu-projeto/mobile --viewport 390x844 --email admin@test.local --password password123
+./scripts/screenshot_project.sh --url http://localhost:4101 --api-url http://localhost:4100 --project-dir workspace/meu-projeto/web --output screenshots/meu-projeto/tablet --viewport 768x1024 --email admin@test.local --password password123
+./scripts/screenshot_project.sh --url http://localhost:4101 --api-url http://localhost:4100 --project-dir workspace/meu-projeto/web --output screenshots/meu-projeto/desktop --viewport 1440x1000 --email admin@test.local --password password123
+```
+
+Ou automatize os três tamanhos com um único comando:
+
+```bash
+./scripts/screenshot_responsive.sh \
+  --url http://localhost:4101 \
+  --api-url http://localhost:4100 \
+  --project-dir workspace/meu-projeto/web \
+  --output screenshots/meu-projeto \
+  --email admin@test.local \
+  --password password123
+```
+
+Os resultados ficam em `screenshots/meu-projeto/mobile`, `tablet` e `desktop`. Adicione `--headed` para visualizar o Chromium durante a execução.
+
+Validação atual concluída: as rotas `/`, `/dashboard`, `/users` e `/settings` foram capturadas com autenticação nos viewports `390x844`, `768x1024` e `1440x1000`, sem rolagem horizontal observada.
+
+Além dos links, ele procura páginas `page.tsx`/`page.ts` em `src/app`. Para aplicações com rotas que não aparecem em links, informe-as manualmente:
+
+```bash
+./scripts/screenshot_project.sh \
+  --url http://localhost:4101 \
+  --project-dir workspace/meu-projeto/web \
+  --output screenshots/meu-projeto \
+  --routes /dashboard,/users,/settings
+```
+
+Se o resultado continuar mostrando apenas `/`, o projeto realmente possui somente a página inicial ou as outras telas ainda não foram criadas. O script não inventa rotas que não existem na aplicação.
+
+Se as páginas exigirem login, informe as credenciais. O script preenche o formulário de entrada, inicia a sessão e só então percorre os links:
+
+```bash
+./scripts/screenshot_project.sh \
+  --url http://localhost:4101 \
+  --project-dir workspace/meu-projeto/web \
+  --output screenshots/meu-projeto \
+  --email admin@example.com \
+  --password 'sua-senha'
+```
+
+Quando o Playwright não estiver instalado, o próprio script instala a dependência no diretório indicado por `--project-dir` e baixa o Chromium automaticamente.
+
+Para acompanhar o Chromium visualmente durante o login e a navegação, adicione `--headed`:
+
+```bash
+./scripts/screenshot_project.sh \
+  --url http://localhost:4101 \
+  --project-dir workspace/meu-projeto/web \
+  --output screenshots/meu-projeto \
+  --email admin@test.local \
+  --password password123 \
+  --headed \
+  --slow-mo 300 \
+  --wait 1000
+```
+
+Em modo `--headed`, não pressione `Ctrl+C` enquanto a captura estiver em andamento. O script usa `domcontentloaded` e `--wait` para funcionar também com o servidor Next.js em modo de desenvolvimento, que mantém uma conexão HMR aberta.
+
+Para limitar a quantidade de páginas:
+
+```bash
+./scripts/screenshot_project.sh \
+  --url http://localhost:4101 \
+  --project-dir workspace/meu-projeto/web \
+  --output screenshots/meu-projeto \
+  --max-pages 20
+```
+
+Se aparecer `Playwright não encontrado`, execute novamente a instalação do passo 1. Se aparecer erro de conexão, verifique se a porta informada em `--url` corresponde à porta real do frontend. Rotas que falharem são exibidas no terminal e não interrompem a captura das demais páginas.
+
+### Roadmap dos projetos gerados
+
+O script cria a estrutura inicial do projeto; os recursos abaixo são a evolução planejada de cada projeto gerado:
+
+- [x] Frontend Next.js com TypeScript, App Router e ESLint.
+- [x] Páginas geradas de conta, dashboard, usuários e configurações com navegação autenticada.
+- [x] Trilha documentada de Responsive Web Design aplicada às páginas e ao dashboard Next.js.
+- [x] Revisão visual responsiva concluída em mobile, tablet e desktop.
+- [x] Backend Elysia com Bun e TypeScript.
+- [x] Configuração compartilhada em `.env.example`.
+- [x] Autenticação base nos templates com backend: login, sessões, logout, troca e recuperação de senha por token.
+- [x] Autorização por roles e permissões nos templates com backend (`admin`, `operator`, `viewer`).
+- [x] Persistência própria do projeto com SQLite (`DB_PATH`, banco separado do orquestrador).
+- [x] Adicionar adapter PostgreSQL, migrations versionadas e autenticação usando o adapter nos templates com backend.
+- [x] Migrar o projeto gerado de referência e adicionar migrations versionadas para os domínios de autenticação, projetos, itens e auditoria.
+- [x] Integração inicial do frontend com a API Elysia: login, sessão, permissões, logout e recuperação de senha.
+- [x] Testes unitários, integração e CI específicos do projeto gerado.
+- [x] Observabilidade, logs JSON, correlação por `request_id` e tratamento padronizado de erros nos projetos gerados.
+- [x] Integração opcional com o orquestrador, workers e dashboard central via `ORCHESTRATOR_API_URL`, token e endpoints protegidos de status, tasks e workers.
+- [x] Scripts para criar e iniciar backend/frontend com portas configuráveis (`--start`, `--api-port` e `--web-port`).
+
 ### Figma MCP (opcional)
 
 Para usar contexto de designs Figma nas tasks frontend, instale e autorize o plugin Figma no Codex. Consulte [`FIGMA_MCP.md`](FIGMA_MCP.md) para a configuração do servidor remoto ou desktop.

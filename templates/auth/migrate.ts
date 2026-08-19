@@ -1,0 +1,4 @@
+import { readFileSync, readdirSync } from "node:fs";
+import { join } from "node:path";
+import type { Store } from "./store";
+export async function migrate(store:Store){const suffix=store.driver==="postgres"?"postgres.sql":"sqlite.sql";await store.exec("CREATE TABLE IF NOT EXISTS schema_migrations (version TEXT PRIMARY KEY, applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)");const files=readdirSync(join(process.cwd(),"migrations")).filter(file=>file.endsWith(suffix)).sort();for(const file of files){if(await store.get("SELECT version FROM schema_migrations WHERE version=?",[file]))continue;for(const statement of readFileSync(join(process.cwd(),"migrations",file),"utf8").split(";").map(v=>v.trim()).filter(Boolean))await store.exec(statement);await store.run("INSERT INTO schema_migrations(version) VALUES(?)",[file]);}}
