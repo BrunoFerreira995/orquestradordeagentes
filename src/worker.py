@@ -14,15 +14,22 @@ class Worker:
     async def run_once(self):
         task=self.queue.claim_ready(self.id)
         if not task: self.queue.heartbeat(self.id,'READY'); return False
+        self.log.info('task_started id=%s attempt=%s title=%s', task.id, task.attempts, task.title)
         self.queue.heartbeat(self.id,'WORKING',task.id)
+        self.queue.progress(task.id,self.id,10,'calling model')
         result=await self.client.chat(PROMPTS[self.role],[],f"Tarefa {task.title}:\n{task.description}")
+        self.queue.progress(task.id,self.id,90,'persisting result')
         self.queue.record_metric(task.id,self.id,getattr(self.client,'model','test'),result)
         if result.status=='completed': task.status=TaskStatus.COMPLETED; task.result={'summary':result.content,'files_changed':[],'tests':[],'warnings':[],'next_actions':[]}; task.error=None
         elif task.attempts < int(os.getenv('MAX_RETRIES','3')): task.status=TaskStatus.RETRYING; task.error=result.error
         else: task.status=TaskStatus.FAILED; task.error=result.error
+        if task.status == TaskStatus.COMPLETED: task.progress=100; task.current_step='completed'
         task.finished_at=now(); self.queue.update(task); self.queue.heartbeat(self.id,'READY'); return True
     async def serve(self, poll=1):
         self.queue.register_worker(self.id,self.role)
         while True:
             worked=await self.run_once()
-            await asyncio.sleep((2 ** max(0, self.queue.get(self.queue.all()[-1].id).attempts-1)) if worked and self.queue.all()[-1].status==TaskStatus.RETRYING else poll)
+            delay = poll
+            if worked and task and self.queue.get(task.id).status == TaskStatus.RETRYING:
+                delay = min(60, 2 ** max(0, task.attempts - 1))
+            await asyncio.sleep(delay)

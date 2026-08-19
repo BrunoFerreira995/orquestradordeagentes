@@ -25,6 +25,9 @@ class Task(BaseModel):
     attempts: int = 0
     result: dict[str, Any] | None = None
     error: str | None = None
+    progress: int = 0
+    current_step: str | None = None
+    heartbeat_at: datetime | None = None
 
 class OllamaResult(BaseModel):
     content: str = ""
@@ -34,4 +37,3 @@ class OllamaResult(BaseModel):
     total_tokens: int = 0
     status: str = "completed"
     error: str | None = None
-

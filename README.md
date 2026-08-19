@@ -137,6 +137,28 @@ Isso encerra a sessão tmux. O banco `data/agents.db` permanece preservado, e ta
 
 Cada worker possui log em `logs/worker-N.log` e workspace próprio. O cliente usa streaming NDJSON, timeout configurável, semaphore de concorrência e retorna contadores de tokens.
 
+### API Elysia (opcional)
+
+Com Bun instalado, a API de consulta pode rodar separadamente:
+
+```bash
+cd api
+bun install
+DB_PATH=../data/agents.db bun run src/index.ts
+```
+
+Ela expõe `/health`, `/tasks`, `/tasks/:id`, `/workers` e `/metrics` em `http://localhost:3000`. O serviço abre o SQLite em modo somente leitura.
+
+Para criar um novo backend Elysia dentro do workspace, execute a partir da raiz do projeto:
+
+```bash
+./scripts/create_backend.sh
+# ou
+./scripts/create_backend.sh workspace/meu-backend
+```
+
+O destino padrão é `workspace/backend`. O caminho pode ser relativo à raiz do projeto ou absoluto, desde que fique dentro de `workspace/`. O script exige Bun e não sobrescreve um destino que já contenha arquivos.
+
 Para trocar o modelo, altere `OLLAMA_MODEL` no `.env` e faça `ollama pull <modelo>`. Para 8 ou mais workers, aumente `WORKER_COUNT`, adicione entradas em `config/agents.yaml` e panes em `scripts/start_workers.sh`; a fila e o limite de concorrência não dependem de quatro workers.
 
 ## Segurança e limitações
@@ -153,11 +175,15 @@ python -m pytest
 
 ### Meses 1–3 — Fundação
 
-- Estabilizar fila, dependências e concorrência.
-- Adicionar logs reais dos workers e progresso no dashboard.
-- Criar a API separada em Elysia.
-- Adicionar testes de integração e CI.
-- Documentar configuração, segurança e convenções do projeto.
+- [x] Estabilizar fila, dependências e concorrência com SQLite WAL, claims transacionais e backoff de retry.
+- [x] Adicionar heartbeat, recuperação de leases expirados e proteção contra tasks órfãs.
+- [x] Adicionar logs reais dos workers e progresso persistido no dashboard.
+- [x] Criar a API separada em Elysia, com endpoints de consulta em modo somente leitura.
+- [x] Adicionar testes automatizados e CI para Python e API.
+- [x] Documentar configuração, segurança e convenções do projeto.
+- [x] Ampliar a cobertura com teste ponta a ponta envolvendo API, fila e workers.
+
+**Status:** fundação implementada e validada com testes unitários, integração e CI.
 
 **Meta:** execução confiável sem tasks órfãs ou bloqueadas indefinidamente.
 
