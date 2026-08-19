@@ -1,0 +1,7 @@
+{
+  "id": "nextjs-only",
+  "name": "Next.js only",
+  "version": "1.0.0",
+  "components": { "frontend": "Next.js + TypeScript + App Router" },
+  "commands": ["./scripts/create_project.sh --template nextjs-only workspace/meu-projeto"]
+}

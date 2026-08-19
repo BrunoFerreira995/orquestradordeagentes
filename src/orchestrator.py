@@ -27,8 +27,10 @@ class Orchestrator:
             self.queue.add(Task(id=child_ids[item.get('title','Subtarefa')],title=item.get('title','Subtarefa'),description=item.get('description',''),assigned_worker=wid,status=TaskStatus.READY if not normalized else TaskStatus.WAITING,dependencies=normalized))
         return root
     async def wait(self, timeout=None):
+        self.queue.reconcile_dependencies()
         async def done():
-            while any(t.status in (TaskStatus.PENDING,TaskStatus.READY,TaskStatus.WAITING,TaskStatus.RUNNING,TaskStatus.RETRYING) for t in self.queue.all()): await asyncio.sleep(.5)
+            while any(t.status in (TaskStatus.PENDING,TaskStatus.READY,TaskStatus.WAITING,TaskStatus.RUNNING,TaskStatus.RETRYING,TaskStatus.AWAITING_APPROVAL) for t in self.queue.all()):
+                self.queue.reconcile_dependencies(); await asyncio.sleep(.5)
         try: await asyncio.wait_for(done(),timeout)
         except asyncio.TimeoutError: return False
         return True

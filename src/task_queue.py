@@ -21,6 +21,7 @@ class TaskQueue:
     def _task(self,r): return Task(id=r['id'],title=r['title'],description=r['description'],assigned_worker=r['assigned_worker'],status=r['status'],priority=r['priority'],dependencies=json.loads(r['dependencies']),created_at=_dt(r['created_at']),started_at=_dt(r['started_at']),finished_at=_dt(r['finished_at']),attempts=r['attempts'],result=json.loads(r['result']) if r['result'] else None,error=r['error'],progress=r['progress'] or 0,current_step=r['current_step'],heartbeat_at=_dt(r['heartbeat_at']))
     def all(self): return [self._task(r) for r in self.db.execute('SELECT * FROM tasks ORDER BY priority DESC,created_at')]
     def claim_ready(self,worker):
+        self.reconcile_dependencies()
         self.db.execute('BEGIN IMMEDIATE')
         try:
           for t in self.all():
@@ -40,6 +41,33 @@ class TaskQueue:
           self.db.commit(); return None
         except Exception:
           self.db.rollback(); raise
+    def reconcile_dependencies(self):
+        """Promote completed gates and block failed or cyclic dependency graphs."""
+        tasks={task.id: task for task in self.all()}
+        active={task.id for task in tasks.values() if task.status in (TaskStatus.PENDING,TaskStatus.READY,TaskStatus.WAITING,TaskStatus.RETRYING)}
+        blocked=set(); missing=set()
+        visiting=set(); visited=set()
+        def visit(task_id, trail=()):
+            if task_id in visiting:
+                blocked.update(trail[trail.index(task_id):]); return
+            if task_id in visited or task_id not in active: return
+            visiting.add(task_id)
+            for dependency in tasks[task_id].dependencies:
+                if dependency in tasks: visit(dependency, trail+(task_id,))
+                else: missing.add(task_id)
+            visiting.remove(task_id); visited.add(task_id)
+        for task_id in active: visit(task_id)
+        for task_id, task in tasks.items():
+            if task_id in missing:
+                names=', '.join(dep for dep in task.dependencies if dep not in tasks)
+                self.db.execute("UPDATE tasks SET status='FAILED',error=?,current_step='invalid dependency' WHERE id=?", (f'dependência inexistente: {names}',task_id))
+                continue
+            if task_id in blocked or any(tasks.get(dep) and tasks[dep].status in (TaskStatus.FAILED,TaskStatus.BLOCKED,TaskStatus.CANCELLED) for dep in task.dependencies):
+                self.db.execute("UPDATE tasks SET status='BLOCKED',error=?,current_step='dependency gate blocked' WHERE id=?", ('dependência inexistente, falha ou ciclo detectado',task_id))
+                continue
+            if task.status in (TaskStatus.PENDING,TaskStatus.WAITING) and task.dependencies and all(tasks.get(dep) and tasks[dep].status == TaskStatus.COMPLETED for dep in task.dependencies):
+                self.db.execute("UPDATE tasks SET status='READY',current_step='dependency gate passed',error=NULL WHERE id=?",(task_id,))
+        self.db.commit()
     def update(self,t): return self.add(t)
     def recover(self, lease_seconds=120):
         cutoff=datetime.now(timezone.utc).timestamp()-lease_seconds

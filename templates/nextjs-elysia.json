@@ -1,0 +1,8 @@
+{
+  "id": "nextjs-elysia",
+  "name": "Next.js + Elysia",
+  "description": "Frontend Next.js com API Elysia e workspace seguro.",
+  "version": "1.0.0",
+  "components": { "frontend": "Next.js + TypeScript + App Router", "backend": "Elysia + Bun" },
+  "commands": ["./scripts/create_project.sh workspace/meu-projeto"]
+}

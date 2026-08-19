@@ -40,7 +40,7 @@ async def test_queue_worker_and_api_end_to_end(tmp_path):
     assert queue.get("INTEGRATION-1").status == TaskStatus.COMPLETED
 
     port = free_port()
-    env = {**os.environ, "DB_PATH": str(db_path), "PORT": str(port)}
+    env = {**os.environ, "DB_PATH": str(db_path), "PORT": str(port), "API_TOKEN": "integration-secret"}
     process = subprocess.Popen(["bun", "run", "src/index.ts"], cwd="api", env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     try:
         url = f"http://127.0.0.1:{port}"
@@ -56,8 +56,9 @@ async def test_queue_worker_and_api_end_to_end(tmp_path):
             output = process.stderr.read().decode()
             pytest.fail(f"API não iniciou: {output}")
 
-        tasks = httpx.get(f"{url}/tasks", timeout=2).json()
-        task = httpx.get(f"{url}/tasks/INTEGRATION-1", timeout=2).json()
+        headers = {"Authorization": "Bearer integration-secret"}
+        tasks = httpx.get(f"{url}/tasks", headers=headers, timeout=2).json()
+        task = httpx.get(f"{url}/tasks/INTEGRATION-1", headers=headers, timeout=2).json()
         assert any(item["id"] == "INTEGRATION-1" for item in tasks)
         assert task["status"] == "COMPLETED"
         assert task["result"]["summary"] == "resultado integrado"

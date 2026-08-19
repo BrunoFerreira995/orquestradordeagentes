@@ -159,11 +159,35 @@ Para criar um novo backend Elysia dentro do workspace, execute a partir da raiz 
 
 O destino padrão é `workspace/backend`. O caminho pode ser relativo à raiz do projeto ou absoluto, desde que fique dentro de `workspace/`. O script exige Bun e não sobrescreve um destino que já contenha arquivos.
 
+Para gerar um projeto completo usando o template Next.js + Elysia:
+
+```bash
+./scripts/create_project.sh workspace/meu-projeto
+```
+
+O gerador cria `web/`, `api/` e `template.json` dentro do destino. O diretório precisa estar vazio e a geração exige Node.js/npx, Bun e internet para baixar os scaffolds.
+
+### Figma MCP (opcional)
+
+Para usar contexto de designs Figma nas tasks frontend, instale e autorize o plugin Figma no Codex. Consulte [`FIGMA_MCP.md`](FIGMA_MCP.md) para a configuração do servidor remoto ou desktop.
+
+### Dashboard web
+
+O dashboard Next.js fica em `web/` e consulta a API Elysia:
+
+```bash
+cd web
+npm install
+NEXT_PUBLIC_API_URL=http://localhost:3000 npm run dev
+```
+
+O dashboard oferece login por e-mail e senha. Para criar o primeiro administrador, defina `ADMIN_EMAIL` e `ADMIN_PASSWORD` antes de iniciar a API. As sessões expiram em 8 horas; `API_TOKEN` permanece disponível como credencial de serviço para automações. Defina também `WEB_ORIGIN` no processo da API.
+
 Para trocar o modelo, altere `OLLAMA_MODEL` no `.env` e faça `ollama pull <modelo>`. Para 8 ou mais workers, aumente `WORKER_COUNT`, adicione entradas em `config/agents.yaml` e panes em `scripts/start_workers.sh`; a fila e o limite de concorrência não dependem de quatro workers.
 
 ## Segurança e limitações
 
-Esta base não executa edição de arquivos nem comandos Git automaticamente: a resposta do modelo é persistida como resultado, deixando a aplicação segura por padrão. O lock SQLite serializa claims; um gerenciador de locks/diffs por arquivo é o próximo passo para habilitar edição real. `start.sh` exige Ollama e tmux reais, mas os testes usam HTTP mockado e não precisam de Ollama.
+A API exige autenticação para leitura e escrita. Usuários `viewer` possuem acesso somente leitura; `operator` pode executar ações operacionais; `admin` possui acesso administrativo. O token de serviço deve ser tratado como segredo de alta permissão. A execução de arquivos ocorre em workspace confinado, com aprovação, snapshot, diff, rollback e timeout; isolamento por container ainda é necessário para comandos não confiáveis.
 
 ## Testes
 
@@ -173,51 +197,77 @@ python -m pytest
 
 ## Roadmap de 1 ano
 
+O roadmap abaixo descreve o estado real do projeto em agosto de 2026. Itens marcados como concluídos representam uma primeira implementação funcional; não significam que a capacidade já esteja pronta para produção em escala.
+
+### Estado atual
+
+- Orquestrador Python com fila SQLite, workers, retries, heartbeat e reconciliação de dependências.
+- API Elysia com consultas, logs, métricas, templates e ações administrativas.
+- Dashboard Next.js inicial em `web/`.
+- Execução controlada com workspace confinado, snapshots, diffs, rollback e comandos com timeout.
+- Aprovação explícita para propostas estruturadas de alteração de arquivos.
+- Autenticação com usuários, sessões expiradas e roles `admin`, `operator` e `viewer`; ainda falta uma tela/API de administração de usuários.
+- Administração de usuários, troca/reset de senha, recuperação por e-mail configurável e auditoria disponíveis na API e no dashboard.
+
 ### Meses 1–3 — Fundação
 
 - [x] Estabilizar fila, dependências e concorrência com SQLite WAL, claims transacionais e backoff de retry.
 - [x] Adicionar heartbeat, recuperação de leases expirados e proteção contra tasks órfãs.
 - [x] Adicionar logs reais dos workers e progresso persistido no dashboard.
-- [x] Criar a API separada em Elysia, com endpoints de consulta em modo somente leitura.
+- [x] Criar a API separada em Elysia, com consultas e ações administrativas protegidas por token.
 - [x] Adicionar testes automatizados e CI para Python e API.
 - [x] Documentar configuração, segurança e convenções do projeto.
 - [x] Ampliar a cobertura com teste ponta a ponta envolvendo API, fila e workers.
 
-**Status:** fundação implementada e validada com testes unitários, integração e CI.
+**Status:** concluída como fundação operacional; a API agora também possui mutações administrativas controladas.
 
 **Meta:** execução confiável sem tasks órfãs ou bloqueadas indefinidamente.
 
 ### Meses 4–6 — Execução real
 
-- Permitir que workers leiam e alterem arquivos dentro de um escopo controlado.
-- Adicionar diffs, aprovação e rollback.
-- Executar comandos em sandbox.
-- Validar alterações com testes automáticos após cada task.
-- Suportar tasks com múltiplos arquivos e dependências complexas.
+- [x] Criar a camada de workspace confinado para leitura e alteração de arquivos.
+- [x] Adicionar snapshots, diffs e rollback como primitives transacionais.
+- [x] Adicionar execução de comandos sem shell, com ambiente reduzido e timeout.
+- [x] Conectar aprovação explícita e interpretação de alterações estruturadas do modelo.
+- [x] Validar alterações com testes automáticos após cada task aprovada.
+- [x] Suportar tasks com múltiplos arquivos no fluxo do worker.
+- [x] Expandir dependências com gates, propagação de falhas, detecção de ciclos e tasks independentes prontas em paralelo.
+- [ ] Adicionar scheduler explícito com limites por projeto, fairness e prioridade dinâmica.
+
+**Status:** primeira versão funcional; isolamento de processo/container e aprovação via dashboard ainda precisam amadurecer.
 
 **Meta:** workers implementarem mudanças reais com segurança.
 
 ### Meses 7–9 — Produto
 
-- Criar o dashboard web em Next.js.
-- Exibir tasks, workers, logs, métricas e resultados.
-- Adicionar autenticação e permissões.
-- Implementar notificações, cancelamento, retry e priorização.
-- Criar templates de projetos, incluindo Next.js + Elysia.
+- [x] Criar o dashboard web inicial em Next.js (`web/`).
+- [x] Exibir tasks, workers, logs, métricas e resultados básicos.
+- [x] Implementar cancelamento, retry e priorização via API.
+- [x] Adicionar login, sessões expiradas e RBAC básico para `admin`, `operator` e `viewer`.
+- [x] Adicionar administração de usuários, troca/reset de senha e auditoria de ações na API e no dashboard.
+- [x] Integrar envio de recuperação por e-mail via Resend, com token expirável e uso único.
+- [x] Criar template executável Next.js + Elysia com geração automatizada via `scripts/create_project.sh`.
+- [x] Adicionar variantes (`nextjs-only` e `elysia-only`), `.env.example` compartilhado e geração administrativa via API.
+- [ ] Adicionar catálogo e acompanhamento visual da geração de templates no dashboard.
+- [ ] Adicionar notificações por polling, webhook ou fila de eventos.
+- [ ] Permitir aprovação, rollback e execução de templates pelo dashboard.
+
+**Status:** dashboard operacional inicial com autenticação básica; precisa de hardening, gestão de usuários, notificações e fluxos completos de produto.
 
 **Meta:** tornar o orquestrador útil para uma equipe de desenvolvimento.
 
 ### Meses 10–12 — Escala e maturidade
 
-- Suportar múltiplos projetos e workspaces.
-- Adicionar execução distribuída dos workers.
-- Melhorar métricas de tokens, tempo e custo.
-- Implementar observabilidade, backups e recuperação.
-- Avaliar automaticamente a qualidade das respostas.
-- Preparar documentação pública e processo de releases.
+- [ ] Suportar múltiplos projetos e workspaces com isolamento por projeto.
+- [ ] Adicionar execução distribuída dos workers.
+- [ ] Melhorar métricas de tokens, tempo e custo por projeto/task.
+- [ ] Implementar observabilidade, backups e recuperação testada.
+- [ ] Avaliar automaticamente a qualidade das respostas e alterações.
+- [ ] Preparar documentação pública, versionamento e processo de releases.
+- [ ] Substituir o sandbox de processo por isolamento externo quando comandos não confiáveis forem habilitados.
 
 **Meta:** oferecer um sistema self-hosted confiável para projetos reais.
 
 ### Resultado esperado após 1 ano
 
-Orquestração multiagente com frontend Next.js, backend Elysia, execução controlada de código, aprovação e rollback, dashboard operacional, testes automatizados, suporte a múltiplos projetos e métricas de qualidade, tempo e custo.
+Orquestração multiagente self-hosted com frontend Next.js, backend Elysia, execução controlada e isolada, aprovação e rollback, dashboard operacional, autenticação por equipe, suporte a múltiplos projetos, notificações e métricas de qualidade, tempo e custo.

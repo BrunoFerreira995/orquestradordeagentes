@@ -1,0 +1,7 @@
+{
+  "id": "elysia-only",
+  "name": "Elysia only",
+  "version": "1.0.0",
+  "components": { "backend": "Elysia + Bun" },
+  "commands": ["./scripts/create_project.sh --template elysia-only workspace/meu-projeto"]
+}
